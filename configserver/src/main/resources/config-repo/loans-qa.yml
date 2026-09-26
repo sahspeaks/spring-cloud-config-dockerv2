@@ -1,0 +1,9 @@
+build:
+  version: 2.0.0
+
+loans:
+  message: Welcome to the Loans Service! QA
+  contactInfo:
+    email: loansqa@example.com
+    phone: +1-123-456-7890
+  onboarding: true

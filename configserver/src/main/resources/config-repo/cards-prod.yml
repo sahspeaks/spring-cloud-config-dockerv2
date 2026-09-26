@@ -1,0 +1,9 @@
+build:
+  version: 3.0.0
+
+cards:
+  message: Welcome to the Cards Service! PROD
+  contactInfo:
+    email: cardsprod@example.com
+    phone: +1-123-456-7890
+  onboarding: true

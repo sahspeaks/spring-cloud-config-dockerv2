@@ -1,0 +1,10 @@
+build:
+  version: 1.0.0
+
+accounts:
+  message: Welcome to the Accounts Service! DEFAULT
+  contactInfo:
+    email: accounts@example.com
+    phone: +1-123-456-7890
+  onboarding: true
+

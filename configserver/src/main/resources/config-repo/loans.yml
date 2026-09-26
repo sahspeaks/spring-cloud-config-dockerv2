@@ -1,0 +1,10 @@
+build:
+  version: 1.0.0
+
+loans:
+  message: Welcome to the Loans Service! DEFAULT
+  contactInfo:
+    email: loans@example.com
+    phone: +1-123-456-7890
+  onboarding: true
+

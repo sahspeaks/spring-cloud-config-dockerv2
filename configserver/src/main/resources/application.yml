@@ -1,0 +1,45 @@
+server:
+  port: 8071
+
+#spring:
+#  application:
+#    name: configserver
+#  profiles:
+#    active: native
+#  cloud:
+#    config:
+#      server:
+#        native:
+##          search-locations: classpath:/config-repo
+#          search-locations: file:///Users//abhishek//Developer//Web Development//UdemyLearn//config-repo
+
+spring:
+  application:
+    name: configserver
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/sahspeaks/config-repo
+          default-label: main
+          clone-on-start: true
+          timeout: 10
+          force-pull: true
+        monitor:
+          validation-filter-enabled: false
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST}
+    port: ${SPRING_RABBITMQ_PORT}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
+
+encrypt:
+  key: ${ENCRYPT_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

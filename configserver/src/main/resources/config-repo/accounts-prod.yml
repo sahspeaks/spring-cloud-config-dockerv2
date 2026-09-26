@@ -1,0 +1,9 @@
+build:
+  version: 3.0.0
+
+accounts:
+  message: Welcome to the Accounts Service! PROD
+  contactInfo:
+    email: accountsprod@example.com
+    phone: +1-123-456-7890
+  onboarding: true

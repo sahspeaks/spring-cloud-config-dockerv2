@@ -1,0 +1,9 @@
+build:
+  version: 2.0.0
+
+accounts:
+  message: Welcome to the Accounts Service! QA
+  contactInfo:
+    email: accountsqa@example.com
+    phone: +1-123-456-7890
+  onboarding: true
