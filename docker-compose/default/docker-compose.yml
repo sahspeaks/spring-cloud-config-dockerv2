@@ -33,7 +33,7 @@ services:
     environment:
       SPRING_APPLICATION_NAME: accounts
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
@@ -52,7 +52,7 @@ services:
     environment:
       SPRING_APPLICATION_NAME: loans
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
@@ -71,7 +71,7 @@ services:
     environment:
       SPRING_APPLICATION_NAME: cards
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
