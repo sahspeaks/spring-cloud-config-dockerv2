@@ -16,6 +16,12 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8071/actuator/health/readiness | grep UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - microservices-network
 
@@ -27,13 +33,14 @@ services:
     environment:
       SPRING_APPLICATION_NAME: accounts
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
-      - configserver
+      configserver:
+        condition: service_healthy
     networks:
       - microservices-network
 
@@ -41,17 +48,18 @@ services:
     image: sahspeaks/loans:latest
     container_name: loans
     ports:
-      - "8090:8090"
+      - "8092:8092"
     environment:
       SPRING_APPLICATION_NAME: loans
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
-      - configserver
+      configserver:
+        condition: service_healthy
     networks:
       - microservices-network
 
@@ -59,17 +67,18 @@ services:
     image: sahspeaks/cards:latest
     container_name: cards
     ports:
-      - "9000:9000"
+      - "8090:8090"
     environment:
       SPRING_APPLICATION_NAME: cards
       SPRING_PROFILES_ACTIVE: qa
-      SPRING_CONFIG_IMPORT: "configserver:http://configserver:8071"
+      SPRING_CONFIG_IMPORT: "optional:configserver:http://configserver:8071"
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
     depends_on:
-      - configserver
+      configserver:
+        condition: service_healthy
     networks:
       - microservices-network
 
