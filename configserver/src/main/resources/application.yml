@@ -1,18 +1,6 @@
 server:
   port: 8071
 
-#spring:
-#  application:
-#    name: configserver
-#  profiles:
-#    active: native
-#  cloud:
-#    config:
-#      server:
-#        native:
-##          search-locations: classpath:/config-repo
-#          search-locations: file:///Users//abhishek//Developer//Web Development//UdemyLearn//config-repo
-
 spring:
   application:
     name: configserver

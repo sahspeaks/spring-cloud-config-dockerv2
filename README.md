@@ -80,7 +80,11 @@ Each file sets `build.version` (1.0.0 default, 2.0.0 qa, 3.0.0 prod) and a `<ser
 ├── cards/                   Cards CRUD
 ├── build-run.sh             build all images with Jib + start the stack (see §5)
 └── docker-compose/
-    ├── default/docker-compose.yml   the full stack (services run with profile "qa")
+    ├── dev/docker-compose.yml       same stack, but runs local sahspeaks/*:dev images (never pulls)
+    ├── dev/.env, dev/.env.example   secrets for the dev stack (same keys as default)
+    ├── default/docker-compose.yml   the full stack
+    ├── default/.env                 credentials + ENCRYPT_KEY (git-ignored, create from .env.example)
+    ├── default/.env.example         template for .env (committed)
     ├── qa/                          empty, reserved
     └── prod/                        empty, reserved
 ```
@@ -171,9 +175,32 @@ The `application.yml` files contain `${...}` placeholders with **no defaults**. 
 | `SPRING_APPLICATION_NAME` | accounts / loans / cards | service name | Must match the file prefix in the config repo |
 | `SPRING_RABBITMQ_HOST` | all four | `rabbitmq` | |
 | `SPRING_RABBITMQ_PORT` | all four | `5672` | |
-| `SPRING_RABBITMQ_USERNAME` | all four | `guest` | |
-| `SPRING_RABBITMQ_PASSWORD` | all four | `guest` | |
-| `ENCRYPT_KEY` | configserver | `mysecretkey` | Symmetric key for the `/encrypt` and `/decrypt` endpoints and `{cipher}` values |
+| `SPRING_RABBITMQ_USERNAME` | all four | `${RABBITMQ_USERNAME}` from `.env` | |
+| `SPRING_RABBITMQ_PASSWORD` | all four | `${RABBITMQ_PASSWORD}` from `.env` | |
+| `ENCRYPT_KEY` | configserver | `${ENCRYPT_KEY}` from `.env` | Symmetric key for the `/encrypt` and `/decrypt` endpoints and `{cipher}` values |
+
+### Secrets: the `.env` file
+
+Credentials and keys aren't written in `docker-compose.yml`. They live in `docker-compose/default/.env`, which is listed in `.gitignore` and never committed:
+
+| `.env` variable | Used for |
+|---|---|
+| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | Creates the RabbitMQ user (`RABBITMQ_DEFAULT_USER` / `RABBITMQ_DEFAULT_PASS`) **and** is passed to all four services as `SPRING_RABBITMQ_USERNAME` / `SPRING_RABBITMQ_PASSWORD`, so the broker and the clients always match |
+| `ENCRYPT_KEY` | Passed to the config server |
+
+First-time setup, after cloning:
+
+```bash
+cp docker-compose/default/.env.example docker-compose/default/.env
+# then edit docker-compose/default/.env and set real values
+```
+
+- Compose reads `.env` from the **same folder as the Compose file**. That works with `cd docker-compose/default && docker compose up`, with `docker compose -f docker-compose/default/docker-compose.yml up` from the repo root, and with `build-run.sh`.
+- Each variable is written as `${VAR:?...}`, so a missing value stops Compose with a clear error (`required variable RABBITMQ_PASSWORD is missing a value: set RABBITMQ_PASSWORD in .env`) instead of starting services with empty credentials.
+- Check what Compose will actually use with `docker compose config`. **This prints the secrets**, so don't paste its output anywhere public.
+- Changing `ENCRYPT_KEY` makes existing `{cipher}...` values in `config-repo` unreadable. Re-encrypt them with the new key.
+- RabbitMQ only creates its user the first time it starts with an empty data directory. This stack has no volume, so `docker compose up -d` recreates the container and the new credentials apply straight away. If you add a volume later, changing the `.env` values won't change an existing user.
+- For a future `qa` / `prod` folder, give it its own `.env` and `.env.example`.
 
 To switch the whole stack to prod config, set `SPRING_PROFILES_ACTIVE: prod` on the three services. `/api/accounts/contact-info` will then say "PROD" and `build.version` becomes `3.0.0`.
 
@@ -188,18 +215,41 @@ To switch the whole stack to prod config, set `SPRING_PROFILES_ACTIVE: prod` on 
 - Docker Desktop, with Compose v2
 - A Docker Hub account, only needed to **push** images
 
+### Dev vs default stack
+
+| | `docker-compose/dev` | `docker-compose/default` |
+|---|---|---|
+| Images | `sahspeaks/<service>:dev`, built on your machine | `sahspeaks/<service>:latest` from Docker Hub |
+| Build command | `mvn compile jib:dockerBuild -Djib.to.image=sahspeaks/<service>:dev` (no upload, no `docker login`) | `mvn compile jib:build` (pushes to Docker Hub) |
+| Pulls from Docker Hub? | Never (`pull_policy: never`); fails if a `:dev` image is missing | Only if the image isn't already local |
+| Container names | `configserver-dev`, `accounts-dev`, `loans-dev`, `cards-dev`, `rabbitmq-dev` | `configserver`, `accounts`, `loans`, `cards`, `rabbitmq` |
+| Use it for | Trying code changes before publishing | Running what's published |
+
+Both stacks use the **same host ports**, so only one can run at a time. Stop one before starting the other:
+
+```bash
+docker compose -f docker-compose/default/docker-compose.yml down
+./build-run.sh dev
+```
+
+The separate `:dev` tag guarantees the dev stack runs what you just built, and never an older copy downloaded from Docker Hub.
+
 ### Option A: build and run everything with `build-run.sh`
 
 `build-run.sh` in the repo root does the whole flow in one command:
 
-1. Builds and **pushes** all four images to Docker Hub with `mvn compile jib:build`, in the order `configserver` → `accounts` → `loans` → `cards`.
+1. Builds all four images, in the order `configserver` → `accounts` → `loans` → `cards`:
+   - `dev`: into your **local** Docker only, as `sahspeaks/<service>:dev` (`jib:dockerBuild`);
+   - `default` / `qa` / `prod`: and **pushes** them to Docker Hub as `:latest` (`jib:build`).
 2. Starts the stack with `docker compose -f docker-compose/<env>/docker-compose.yml up -d --remove-orphans`.
 3. Prints `docker compose ps` and the command for following the logs.
 
 ```bash
 chmod +x build-run.sh                 # once, otherwise: "zsh: permission denied"
-docker login                          # once, because the script pushes to Docker Hub
+docker login                          # once, only needed for default/qa/prod (they push)
 
+./build-run.sh dev                    # build locally (:dev) + run docker-compose/dev, no push
+./build-run.sh dev --no-build         # rerun the dev stack with the :dev images you already have
 ./build-run.sh                        # build + push + run, using docker-compose/default
 ./build-run.sh default --no-build     # skip the Maven/Jib step, just (re)start the stack
 ./build-run.sh qa                     # use docker-compose/qa/docker-compose.yml
@@ -208,7 +258,7 @@ docker login                          # once, because the script pushes to Docke
 
 | Argument | Values | Default | Effect |
 |---|---|---|---|
-| 1st | `default`, `qa`, `prod` | `default` | Picks the Compose file `docker-compose/<env>/docker-compose.yml`. Any other value exits with a usage message. |
+| 1st | `dev`, `default`, `qa`, `prod` | `default` | Picks the Compose file `docker-compose/<env>/docker-compose.yml`. Any other value exits with a usage message. |
 | 2nd | `--no-build` | build | Skips the image build and only runs Compose |
 
 Behaviour to know:
@@ -415,11 +465,57 @@ Every service includes `spring-cloud-starter-bus-amqp` and exposes `refresh` and
    ```
 3. `curl localhost:8080/api/accounts/contact-info` now shows the new values. `@ConfigurationProperties` beans are re-bound. `@Value` fields such as `build.version` are **not** updated unless the bean is `@RefreshScope`.
 
-**Automatic (GitHub webhook):**
+**Automatic: GitHub webhook + Hookdeck (current setup)**
 
-1. Add a GitHub webhook on `config-repo` that POSTs to `https://<public-url>/monitor` with content type `application/json`.
-2. GitHub can't reach `localhost`, so expose port 8071 through a tunnel such as ngrok, Cloudflare Tunnel or hookdeck.
-3. On a push, the config server's `/monitor` publishes a refresh event on the bus. Every service reloads.
+With this set up, pushing to `config-repo` is enough. You don't need to call `refresh` or `busrefresh`.
+
+```
+git push to config-repo
+   → GitHub webhook (push event)
+   → Hookdeck (public URL)
+   → hookdeck CLI on your machine
+   → POST localhost:8071/monitor         (config server, spring-cloud-config-monitor)
+   → refresh event on RabbitMQ           (Spring Cloud Bus)
+   → accounts / loans / cards re-fetch their config and re-bind
+```
+
+GitHub can't reach `localhost`. Hookdeck gives you a public URL and forwards each webhook to your machine through the CLI.
+
+One-time setup:
+
+1. Install the Hookdeck CLI and log in:
+   ```bash
+   brew install hookdeck/hookdeck/hookdeck
+   hookdeck login
+   ```
+2. Start the tunnel. Keep this terminal open while you work:
+   ```bash
+   hookdeck listen 8071 Source --cli-path /monitor
+   ```
+   - `8071` is the local port to forward to (the config server).
+   - `Source` is the name of the Hookdeck source.
+   - `--cli-path /monitor` means requests are delivered to `http://localhost:8071/monitor`.
+
+   The CLI prints a public URL such as `https://hkdk.events/xxxxxxxx`. The URL stays the same for the same source name, so you only add it to GitHub once.
+3. In GitHub, go to **sahspeaks/config-repo → Settings → Webhooks → Add webhook**:
+   - **Payload URL**: the Hookdeck URL from step 2
+   - **Content type**: `application/json`
+   - **Events**: "Just the push event"
+
+Day-to-day use:
+
+1. Start the stack (`./build-run.sh` or `docker compose up -d`) and `hookdeck listen ...`.
+2. Edit and push a file in `config-repo`, for example change `accounts.message` in `accounts-qa.yml`.
+3. After a few seconds, `curl localhost:8080/api/accounts/contact-info` shows the new value.
+
+How it decides what to refresh: `/monitor` reads the changed file names from GitHub's push payload and turns them into service names (`accounts-qa.yml` → `accounts`). It then sends the refresh event on the bus to those services only. A change to `application.yml` refreshes every service.
+
+Checking that it worked:
+
+- The `hookdeck listen` terminal logs each forwarded request. It should show `POST /monitor` with a `200` response.
+- In GitHub, **Webhooks → Recent Deliveries** shows every delivery and its response code.
+- `docker compose logs -f accounts` shows the config being fetched again (`Fetching config from server`) after the push.
+- If the tunnel isn't running when you push, that webhook is lost and nothing refreshes. Run `curl -X POST localhost:8080/actuator/busrefresh` once to catch up.
 
 **Encrypting secrets in the config repo:**
 
@@ -443,7 +539,7 @@ The config server decrypts `{cipher}` values with `ENCRYPT_KEY` before serving t
 
 **Configuration and security**
 - [ ] Fill in `docker-compose/qa` and `docker-compose/prod` with their own Compose files (profile `qa` / `prod`), or use one file plus `.env` files.
-- [ ] Move `ENCRYPT_KEY` and the RabbitMQ credentials out of the Compose file into an `.env` file (git-ignored) or Docker secrets.
+- [ ] Move from `.env` to Docker secrets or a secret manager (Vault, AWS Secrets Manager) for real deployments.
 - [ ] Reduce the config server's actuator exposure from `"*"` to only what's needed (`health, info, busrefresh, monitor`).
 - [ ] Protect the config server with Spring Security (basic auth), and use a GitHub token or deploy key if `config-repo` becomes private.
 - [ ] Add `spring.cloud.config.retry` (+ `spring-retry`) on clients for extra startup resilience.
@@ -474,7 +570,12 @@ The config server decrypts `{cipher}` values with `ENCRYPT_KEY` before serving t
 | Service reachable in the container but not from the host | Host:container port mismatch | Check the `ports:` mapping against `server.port` |
 | `jib:build` → `401 Unauthorized` | Not logged in to Docker Hub | `docker login`, or pass `-Djib.to.auth.*` |
 | Pushed a new image but Compose runs the old one | Local cache of `latest` | `docker compose pull && docker compose up -d` |
+| `required variable RABBITMQ_USERNAME is missing a value` | No `docker-compose/default/.env` | `cp docker-compose/default/.env.example docker-compose/default/.env` and fill it in |
+| Services log `ACCESS_REFUSED - Login was refused` from RabbitMQ | `.env` credentials changed, but the old rabbitmq container is still running | `docker compose up -d` (recreates rabbitmq with the new user) |
+| `No such image: sahspeaks/accounts:dev` on the dev stack | The `:dev` image hasn't been built yet | `./build-run.sh dev` (without `--no-build`) |
+| `Bind for 0.0.0.0:8080 failed: port is already allocated` | The other stack, or an app in your IDE, is using the port | `docker compose -f docker-compose/<other>/docker-compose.yml down`, or stop the IDE app |
 | `zsh: permission denied: ./build-run.sh` | Script isn't executable | `chmod +x build-run.sh` |
 | `Docker Compose file not found: .../docker-compose/qa/docker-compose.yml` | `qa` / `prod` Compose files don't exist yet | Use `./build-run.sh default`, or create the file |
 | `build-run.sh` finished but the containers run old code | Compose reused the local `latest` images instead of pulling the new ones | `docker compose -f docker-compose/default/docker-compose.yml pull`, then run with `--no-build` |
-| Config change in GitHub not visible | No refresh was triggered | `POST /actuator/busrefresh` on any service |
+| Config change in GitHub not visible | `hookdeck listen` wasn't running, or the webhook failed (check GitHub → Webhooks → Recent Deliveries) | Start `hookdeck listen 8071 Source --cli-path /monitor`, or run `POST /actuator/busrefresh` on any service once |
+| Refresh happened but `/java-version` still shows the old `build.version` | `@Value` fields aren't re-bound on refresh | Add `@RefreshScope` to the bean, or restart the service |

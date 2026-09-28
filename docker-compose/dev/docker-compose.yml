@@ -1,9 +1,11 @@
-
+# Dev stack: runs images built on this machine, never pulls from Docker Hub.
+# Build them first:  ./build-run.sh dev   (or, per service: mvn compile jib:dockerBuild -Djib.to.image=sahspeaks/<service>:dev)
 services:
 
   configserver:
-    image: sahspeaks/configserver:latest
-    container_name: configserver
+    image: sahspeaks/configserver:dev
+    pull_policy: never
+    container_name: configserver-dev
     ports:
       - "8071:8071"
     environment:
@@ -26,8 +28,9 @@ services:
       - microservices-network
 
   accounts:
-    image: sahspeaks/accounts:latest
-    container_name: accounts
+    image: sahspeaks/accounts:dev
+    pull_policy: never
+    container_name: accounts-dev
     ports:
       - "8080:8080"
     environment:
@@ -45,8 +48,9 @@ services:
       - microservices-network
 
   loans:
-    image: sahspeaks/loans:latest
-    container_name: loans
+    image: sahspeaks/loans:dev
+    pull_policy: never
+    container_name: loans-dev
     ports:
       - "8092:8092"
     environment:
@@ -64,8 +68,9 @@ services:
       - microservices-network
 
   cards:
-    image: sahspeaks/cards:latest
-    container_name: cards
+    image: sahspeaks/cards:dev
+    pull_policy: never
+    container_name: cards-dev
     ports:
       - "8090:8090"
     environment:
@@ -84,7 +89,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: rabbitmq
+    container_name: rabbitmq-dev
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?set RABBITMQ_USERNAME in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}

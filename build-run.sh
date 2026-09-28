@@ -2,7 +2,9 @@
 
 set -euo pipefail
 
-# Usage: ./build-run.sh [default|qa|prod] [--no-build]
+# Usage: ./build-run.sh [dev|default|qa|prod] [--no-build]
+#   dev: builds images into local Docker only (tag :dev), nothing is pushed
+#   others: builds and pushes :latest images to Docker Hub
 
 ENVIRONMENT="${1:-default}"
 BUILD=true
@@ -17,11 +19,11 @@ COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 
 # Validate environment
 case "$ENVIRONMENT" in
-    default|qa|prod)
+    dev|default|qa|prod)
         ;;
     *)
         echo "Invalid environment: $ENVIRONMENT"
-        echo "Usage: $0 [default|qa|prod] [--no-build]"
+        echo "Usage: $0 [dev|default|qa|prod] [--no-build]"
         exit 1
         ;;
 esac
@@ -40,7 +42,11 @@ if [[ "$BUILD" == true ]]; then
 
         (
             cd "$ROOT_DIR/$SERVICE"
-            mvn compile jib:build
+            if [[ "$ENVIRONMENT" == dev ]]; then
+                mvn compile jib:dockerBuild -Djib.to.image="sahspeaks/$SERVICE:dev"
+            else
+                mvn compile jib:build
+            fi
         )
     done
 fi
