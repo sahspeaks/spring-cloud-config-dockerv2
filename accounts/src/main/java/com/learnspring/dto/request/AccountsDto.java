@@ -1,13 +1,16 @@
 package com.learnspring.dto.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class AccountsDto {
-    @NotEmpty(message = "AccountNumber can not be a null or empty")
-    @Pattern(regexp="(^$|[0-9]{10})",message = "AccountNumber must be 10 digits")
+    @NotNull(message = "AccountNumber can not be null")
+    @Min(value = 1000000000L, message = "AccountNumber must be 10 digits")
+    @Max(value = 9999999999L, message = "AccountNumber must be 10 digits")
     private Long accountNumber;
 
     @NotEmpty(message = "AccountType can not be a null or empty")
