@@ -3,10 +3,12 @@ package com.learnspring.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
 @Data
+@Table(name="accounts")
 public class AccountsEntity extends BaseEntity{
 
     @Column(name="customer_id")
